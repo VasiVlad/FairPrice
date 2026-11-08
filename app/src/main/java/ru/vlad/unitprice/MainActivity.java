@@ -114,6 +114,11 @@ public final class MainActivity extends Activity {
         checkUpdates.setOnClickListener(v -> checkUpdates(checkUpdates));
         root.addView(checkUpdates, uLp);
 
+        Button testParser = new Button(this);
+        testParser.setText("Тест парсера");
+        testParser.setOnClickListener(v -> startActivity(new Intent(this, TestActivity.class)));
+        root.addView(testParser, uLp);
+
         setContentView(root);
     }
 

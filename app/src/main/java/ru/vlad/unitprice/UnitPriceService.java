@@ -24,6 +24,11 @@ public final class UnitPriceService extends AccessibilityService {
     private String currentPackage = "";
     private boolean scrolling = false;
     private boolean holding = false;
+    private int lastCardCount = 0;
+    private boolean retriedEmpty = false;
+
+    /** Разрешает обработку собственного экрана (полигон парсера). */
+    static volatile boolean allowSelfStatic = false;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable scanTask = this::scan;
@@ -31,11 +36,26 @@ public final class UnitPriceService extends AccessibilityService {
         scrolling = false;
         scan();
     };
+    private final Runnable watchdogTask = this::runWatchdog;
+    private final Runnable holdReleaseTask = () -> {
+        holding = false;
+        scan();
+    };
+
+    private void runWatchdog() {
+        if (!scrolling && !holding && overlay != null) {
+            scan();
+        }
+        handler.postDelayed(watchdogTask, 2500);
+    }
     private final Runnable holdTask = () -> {
         holding = true;
         if (overlay != null) {
             overlay.hide();
         }
+        // Страховка: если событие отпускания потеряется, вернуть чипы через 2,5 с.
+        handler.removeCallbacks(holdReleaseTask);
+        handler.postDelayed(holdReleaseTask, 2500);
     };
 
     private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sp, key) -> {
@@ -47,6 +67,12 @@ public final class UnitPriceService extends AccessibilityService {
             } else {
                 scan();
             }
+        } else if (Prefs.KEY_ALLOW_SELF.equals(key)) {
+            if (sp.getBoolean(key, false)) {
+                scan();
+            } else if (overlay != null) {
+                overlay.clear();
+            }
         }
     };
 
@@ -57,6 +83,8 @@ public final class UnitPriceService extends AccessibilityService {
         holding = false;
         getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(prefListener);
+        handler.removeCallbacks(watchdogTask);
+        handler.postDelayed(watchdogTask, 2500);
 
         AccessibilityServiceInfo info = getServiceInfo();
         if (info != null) {
@@ -89,6 +117,7 @@ public final class UnitPriceService extends AccessibilityService {
         }
         if (type == AccessibilityEvent.TYPE_TOUCH_INTERACTION_END) {
             handler.removeCallbacks(holdTask);
+            handler.removeCallbacks(holdReleaseTask);
             if (holding) {
                 holding = false;
                 handler.removeCallbacks(scanTask);
@@ -101,7 +130,12 @@ public final class UnitPriceService extends AccessibilityService {
             return;
         }
         String pkg = event.getPackageName().toString();
-        if (pkg.equals(getPackageName()) || pkg.equals("com.android.systemui")) {
+        if (pkg.equals("com.android.systemui")) {
+            return;
+        }
+        // События от собственных окон (чипов) не должны запускать пересканирование:
+        // иначе получается бесконечный цикл render → event → render.
+        if (pkg.equals(getPackageName())) {
             return;
         }
         if (!Prefs.allApps(this) && !Prefs.SUPPORTED.contains(pkg)) {
@@ -166,6 +200,8 @@ public final class UnitPriceService extends AccessibilityService {
         handler.removeCallbacks(scanTask);
         handler.removeCallbacks(endScrollTask);
         handler.removeCallbacks(holdTask);
+        handler.removeCallbacks(holdReleaseTask);
+        handler.removeCallbacks(watchdogTask);
         try {
             getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
                     .unregisterOnSharedPreferenceChangeListener(prefListener);
@@ -199,12 +235,36 @@ public final class UnitPriceService extends AccessibilityService {
         int width = getResources().getDisplayMetrics().widthPixels;
         int height = getResources().getDisplayMetrics().heightPixels;
 
+        CharSequence rootPkg = null;
+        try {
+            rootPkg = root.getPackageName();
+        } catch (Exception ignored) {
+        }
+        String pkg = rootPkg == null ? currentPackage : rootPkg.toString();
+        if (pkg.equals(getPackageName()) && !allowSelfStatic && !Prefs.allowSelf(this)) {
+            overlay.clear();
+            return;
+        }
+
         List<CardBuilder.TextNode> nodes = new ArrayList<>();
         List<Rect> images = new ArrayList<>();
         collect(root, nodes, images, 0, width, height);
 
-        boolean kopeckMode = "ru.pyaterochka.app.browser".equals(currentPackage);
-        overlay.render(CardBuilder.build(nodes, images, width, kopeckMode));
+        boolean kopeckMode = "ru.pyaterochka.app.browser".equals(pkg);
+        List<CardBuilder.Card> cards = CardBuilder.build(nodes, images, width, kopeckMode);
+        android.util.Log.d("FairPrice", "scan pkg=" + pkg + " nodes=" + nodes.size()
+                + " images=" + images.size() + " cards=" + cards.size());
+
+        // Дерево иногда приходит недособранным: не гасим чипы с первого пустого результата.
+        if (cards.isEmpty() && lastCardCount > 0 && !retriedEmpty) {
+            retriedEmpty = true;
+            handler.removeCallbacks(scanTask);
+            handler.postDelayed(scanTask, 250);
+            return;
+        }
+        retriedEmpty = false;
+        lastCardCount = cards.size();
+        overlay.render(cards);
     }
 
     private void collect(AccessibilityNodeInfo node, List<CardBuilder.TextNode> out,

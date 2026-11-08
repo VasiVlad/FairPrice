@@ -49,6 +49,7 @@ public final class CardBuilder {
     public static List<Card> build(List<TextNode> nodes, List<Rect> images, int width, boolean kopeckMode) {
         TextParser tp = new TextParser(kopeckMode);
         List<Card> result = new ArrayList<>();
+        List<Card> combined = new ArrayList<>();
 
         List<TextNode> priceNodes = new ArrayList<>();
         for (TextNode n : nodes) {
@@ -75,11 +76,8 @@ public final class CardBuilder {
                     c.price = actual;
                 }
                 c.photo = findPhoto(c.anchor, images);
-                result.add(c);
+                combined.add(c);
             }
-        }
-        if (!result.isEmpty()) {
-            return result;
         }
 
         List<TextNode> weights = new ArrayList<>();
@@ -118,7 +116,9 @@ public final class CardBuilder {
                     bestName = n;
                 }
                 // У Ozon вес/объём лежит внутри названия, а ближайший текст — плашка «Новинка».
-                if (tp.parseWeightGrams(n.text) != null && cost < bestWeightedCost) {
+                if (tp.parseWeightGrams(n.text) != null
+                        && overlapsX(pn.bounds, n.bounds)
+                        && cost < bestWeightedCost) {
                     bestWeightedCost = cost;
                     bestWeightedName = n;
                 }
@@ -128,7 +128,7 @@ public final class CardBuilder {
             double bestCost = 1e9;
             for (TextNode w : weights) {
                 double dy = Math.abs(w.bounds.centerY() - pn.bounds.centerY());
-                if (dy > 420) {
+                if (dy > 300) {
                     continue;
                 }
                 double dx = Math.abs(w.bounds.centerX() - pn.bounds.centerX());
@@ -168,9 +168,36 @@ public final class CardBuilder {
                 c.name = bestName.text;
             }
             c.photo = findPhoto(c.anchor, images);
-            result.add(c);
+            if (!nearCombined(combined, c)) {
+                result.add(c);
+            }
         }
+        result.addAll(combined);
         return result;
+    }
+
+    /**
+     * Не дублировать карточку, если рядом уже есть «комбинированная»:
+     * под ней часто лежат отдельные узлы со старой и новой ценой.
+     */
+    private static boolean nearCombined(List<Card> combined, Card c) {
+        if (combined.isEmpty() || c.anchor == null) {
+            return false;
+        }
+        for (Card cc : combined) {
+            if (cc.anchor == null) {
+                continue;
+            }
+            int overlap = Math.min(cc.anchor.right, c.anchor.right) - Math.max(cc.anchor.left, c.anchor.left);
+            if (overlap <= 0) {
+                continue;
+            }
+            int dy = c.anchor.centerY() - cc.anchor.centerY();
+            if (dy > -60 && dy < 500) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -229,6 +256,10 @@ public final class CardBuilder {
             }
         }
         return best == null ? null : tp.parsePrice(best.text);
+    }
+
+    private static boolean overlapsX(Rect a, Rect b) {
+        return Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0;
     }
 
     private static boolean isBadge(String t) {

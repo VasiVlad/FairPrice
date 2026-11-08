@@ -11,6 +11,7 @@ public final class Prefs {
     public static final String NAME = "unitprice";
     public static final String KEY_ALL = "all_apps";
     public static final String KEY_OVERLAY = "overlay_enabled";
+    public static final String KEY_ALLOW_SELF = "allow_self";
 
     public static final Set<String> SUPPORTED = new HashSet<>(Arrays.asList(
             "ru.pyaterochka.app.browser",
@@ -41,5 +42,13 @@ public final class Prefs {
 
     public static void setOverlayEnabled(Context c, boolean value) {
         c.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_OVERLAY, value).apply();
+    }
+
+    public static boolean allowSelf(Context c) {
+        return c.getSharedPreferences(NAME, Context.MODE_PRIVATE).getBoolean(KEY_ALLOW_SELF, false);
+    }
+
+    public static void setAllowSelf(Context c, boolean value) {
+        c.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_ALLOW_SELF, value).apply();
     }
 }
