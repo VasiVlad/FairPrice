@@ -25,6 +25,7 @@ public final class OverlayManager {
     private final int screenWidth;
     private final int screenHeight;
     private final List<TextView> chips = new ArrayList<>();
+    private String lastSignature = "";
 
     public OverlayManager(Context context) {
         this.context = context;
@@ -61,6 +62,7 @@ public final class OverlayManager {
     }
 
     public void hide() {
+        lastSignature = "";
         for (TextView tv : chips) {
             tv.setVisibility(View.GONE);
         }
@@ -88,6 +90,19 @@ public final class OverlayManager {
             }
             visible.add(c);
         }
+
+        // Если набор и позиции не изменились — не трогаем окна (меньше нагрузки).
+        StringBuilder sig = new StringBuilder();
+        for (CardBuilder.Card c : visible) {
+            sig.append(Math.round(c.perUnit())).append('|')
+                    .append(c.anchor.toShortString()).append('|')
+                    .append(c.photo == null ? "-" : c.photo.toShortString()).append(';');
+        }
+        String signature = sig.toString();
+        if (signature.equals(lastSignature) && !chips.isEmpty()) {
+            return;
+        }
+        lastSignature = signature;
 
         for (int i = 0; i < visible.size(); i++) {
             CardBuilder.Card c = visible.get(i);
@@ -197,6 +212,7 @@ public final class OverlayManager {
     }
 
     public void clear() {
+        lastSignature = "";
         for (TextView tv : chips) {
             try {
                 wm.removeView(tv);

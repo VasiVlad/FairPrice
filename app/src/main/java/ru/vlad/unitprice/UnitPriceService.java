@@ -2,6 +2,10 @@ package ru.vlad.unitprice;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Rect;
 import android.os.Handler;
@@ -14,10 +18,10 @@ import java.util.List;
 
 public final class UnitPriceService extends AccessibilityService {
 
-    private static final long DEBOUNCE_MS = 250;
-    private static final long SCROLL_END_MS = 180;
+    private static final long DEBOUNCE_MS = 180;
+    private static final long SCROLL_END_MS = 120;
     private static final long HOLD_MS = 350;
-    private static final int MAX_NODES = 1500;
+    private static final int MAX_NODES = 1000;
     private static final int MAX_DEPTH = 60;
 
     private OverlayManager overlay;
@@ -58,6 +62,28 @@ public final class UnitPriceService extends AccessibilityService {
         handler.postDelayed(holdReleaseTask, 2500);
     };
 
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent == null ? null : intent.getAction();
+            if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                handler.removeCallbacks(scanTask);
+                handler.removeCallbacks(endScrollTask);
+                handler.removeCallbacks(holdTask);
+                handler.removeCallbacks(holdReleaseTask);
+                scrolling = false;
+                holding = false;
+                if (overlay != null) {
+                    overlay.clear();
+                }
+            } else if (Intent.ACTION_SCREEN_ON.equals(action)
+                    || Intent.ACTION_USER_PRESENT.equals(action)) {
+                handler.removeCallbacks(watchdogTask);
+                handler.postDelayed(watchdogTask, 800);
+            }
+        }
+    };
+
     private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sp, key) -> {
         if (Prefs.KEY_OVERLAY.equals(key)) {
             if (!sp.getBoolean(key, true)) {
@@ -83,6 +109,16 @@ public final class UnitPriceService extends AccessibilityService {
         holding = false;
         getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(prefListener);
+
+        IntentFilter screenFilter = new IntentFilter();
+        screenFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        screenFilter.addAction(Intent.ACTION_SCREEN_ON);
+        screenFilter.addAction(Intent.ACTION_USER_PRESENT);
+        try {
+            registerReceiver(screenReceiver, screenFilter);
+        } catch (Exception ignored) {
+        }
+
         handler.removeCallbacks(watchdogTask);
         handler.postDelayed(watchdogTask, 2500);
 
@@ -131,6 +167,13 @@ public final class UnitPriceService extends AccessibilityService {
         }
         String pkg = event.getPackageName().toString();
         if (pkg.equals("com.android.systemui")) {
+            // Экран блокировки или шторка: чипы должны исчезнуть сразу.
+            if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && overlay != null) {
+                overlay.clear();
+                scrolling = false;
+                holding = false;
+                handler.removeCallbacks(scanTask);
+            }
             return;
         }
         // События от собственных окон (чипов) не должны запускать пересканирование:
@@ -205,6 +248,10 @@ public final class UnitPriceService extends AccessibilityService {
         try {
             getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
                     .unregisterOnSharedPreferenceChangeListener(prefListener);
+        } catch (Exception ignored) {
+        }
+        try {
+            unregisterReceiver(screenReceiver);
         } catch (Exception ignored) {
         }
         if (overlay != null) {
