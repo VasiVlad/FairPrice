@@ -39,6 +39,10 @@ public final class TextParser {
             "(\\d+(?:[.,]\\d+)?)\\s*(кг|гр|г|мл|л)\\b",
             Pattern.CASE_INSENSITIVE);
 
+    /** "104 99" — рубли и копейки через пробел (Бристоль). */
+    private static final Pattern SPACED_KOPECKS = Pattern.compile(
+            "^(\\d[\\d\\s]*?)\\s+(\\d{2})$");
+
     public static final class Parsed {
         public double grams;
         public double price;
@@ -103,7 +107,21 @@ public final class TextParser {
     }
 
     private double toRub(String num, boolean glued) {
-        String s = num.replaceAll("\\s+", "").replace(',', '.');
+        String raw = num.trim();
+
+        // "104 99" — рубли и копейки через пробел (Бристоль и подобные).
+        Matcher spaced = SPACED_KOPECKS.matcher(raw);
+        if (spaced.matches()) {
+            try {
+                double rub = Double.parseDouble(spaced.group(1).replaceAll("\\s+", ""));
+                double kop = Double.parseDouble(spaced.group(2));
+                return rub + kop / 100.0;
+            } catch (NumberFormatException ignored) {
+                // падаем в общую ветку
+            }
+        }
+
+        String s = raw.replaceAll("\\s+", "").replace(',', '.');
         try {
             double v = Double.parseDouble(s);
             if (kopeckMode && glued && s.indexOf('.') < 0 && v >= 100) {

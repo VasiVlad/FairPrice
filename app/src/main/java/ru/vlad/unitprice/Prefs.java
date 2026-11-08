@@ -18,6 +18,7 @@ public final class Prefs {
             "ru.samokat.app",
             "ru.sbcs.store",
             "ru.instamart",
+            "ru.bristol.bristol_app",
             "ru.ozon.fresh",
             "ru.ozon.app.android",
             "ru.ozon.app"

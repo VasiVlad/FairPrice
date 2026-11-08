@@ -17,8 +17,8 @@ public final class UnitPriceService extends AccessibilityService {
     private static final long DEBOUNCE_MS = 250;
     private static final long SCROLL_END_MS = 180;
     private static final long HOLD_MS = 350;
-    private static final int MAX_NODES = 400;
-    private static final int MAX_DEPTH = 40;
+    private static final int MAX_NODES = 1500;
+    private static final int MAX_DEPTH = 60;
 
     private OverlayManager overlay;
     private String currentPackage = "";
