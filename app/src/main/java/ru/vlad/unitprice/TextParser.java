@@ -69,15 +69,39 @@ public final class TextParser {
 
     public Double parsePrice(String raw) {
         Matcher m = PRICE.matcher(norm(raw));
-        if (!m.find()) {
+        String lastNum = null;
+        String lastGap = null;
+        while (m.find()) {
+            lastNum = m.group(1);
+            lastGap = m.group(2);
+        }
+        if (lastNum == null) {
             return null;
         }
-        double v = toRub(m.group(1), m.group(2).isEmpty());
+        double v = toRub(lastNum, lastGap != null && lastGap.isEmpty());
         return v > 0 ? v : null;
     }
 
     public boolean isPurePrice(String raw) {
         return PURE_PRICE.matcher(norm(raw)).matches();
+    }
+
+    /**
+     * Узел — цена, если в нём есть цена и нет букв.
+     * Так отсекаются «289 ₽ Бесплатно» и «от 70 ₽ за …», но проходят
+     * многострочные ценники вроде "49.99 ₽ 44 99 ₽".
+     */
+    public boolean isPriceNode(String raw) {
+        String s = norm(raw);
+        if (!PRICE.matcher(s).find()) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            if (Character.isLetter(s.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public Double parseWeightGrams(String raw) {

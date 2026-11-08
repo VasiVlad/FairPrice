@@ -247,7 +247,7 @@ public final class UnitPriceService extends AccessibilityService {
         }
 
         List<CardBuilder.TextNode> nodes = new ArrayList<>();
-        List<Rect> images = new ArrayList<>();
+        List<CardBuilder.Img> images = new ArrayList<>();
         collect(root, nodes, images, 0, width, height);
 
         boolean kopeckMode = "ru.pyaterochka.app.browser".equals(pkg);
@@ -268,7 +268,7 @@ public final class UnitPriceService extends AccessibilityService {
     }
 
     private void collect(AccessibilityNodeInfo node, List<CardBuilder.TextNode> out,
-                         List<Rect> images, int depth, int screenW, int screenH) {
+                         List<CardBuilder.Img> images, int depth, int screenW, int screenH) {
         if (node == null || depth > MAX_DEPTH || out.size() >= MAX_NODES) {
             return;
         }
@@ -278,18 +278,18 @@ public final class UnitPriceService extends AccessibilityService {
         boolean validBounds = r.width() > 0 && r.height() > 0;
 
         CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
         String value = (text != null && text.length() > 0) ? text.toString() : null;
 
         // Ozon (и некоторые другие) кладут цену в content-desc: "price_205₽".
-        if (value == null) {
-            CharSequence desc = node.getContentDescription();
-            if (desc != null && desc.length() > 0) {
-                value = desc.toString();
-                if (value.startsWith("price_")) {
-                    value = value.substring("price_".length());
-                }
+        if (value == null && desc != null && desc.length() > 0) {
+            value = desc.toString();
+            if (value.startsWith("price_")) {
+                value = value.substring("price_".length());
             }
         }
+
+        boolean priceNode = value != null && value.contains("₽");
 
         if (value != null && value.length() > 0 && validBounds
                 && r.bottom > 0 && r.top < screenH) {
@@ -298,11 +298,13 @@ public final class UnitPriceService extends AccessibilityService {
 
         String cls = node.getClassName() == null ? "" : node.getClassName().toString();
         boolean looksLikeImage = cls.contains("ImageView") || cls.equals("android.view.View");
-        if (looksLikeImage && validBounds
+        if (looksLikeImage && validBounds && !priceNode
                 && r.width() >= 150 && r.height() >= 200
                 && r.width() <= screenW
                 && r.height() <= screenH * 0.7) {
-            images.add(new Rect(r));
+            boolean bare = (text == null || text.length() == 0)
+                    && (desc == null || desc.length() == 0);
+            images.add(new CardBuilder.Img(new Rect(r), bare));
         }
 
         int count = node.getChildCount();

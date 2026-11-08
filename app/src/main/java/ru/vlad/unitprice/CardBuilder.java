@@ -46,7 +46,18 @@ public final class CardBuilder {
         }
     }
 
-    public static List<Card> build(List<TextNode> nodes, List<Rect> images, int width, boolean kopeckMode) {
+    /** Кандидат на «фото»: прямоугольник и признак «голой» картинки без подписи. */
+    public static final class Img {
+        public final Rect rect;
+        public final boolean bare;
+
+        public Img(Rect rect, boolean bare) {
+            this.rect = rect;
+            this.bare = bare;
+        }
+    }
+
+    public static List<Card> build(List<TextNode> nodes, List<Img> images, int width, boolean kopeckMode) {
         TextParser tp = new TextParser(kopeckMode);
         List<Card> result = new ArrayList<>();
         List<Card> combined = new ArrayList<>();
@@ -56,7 +67,7 @@ public final class CardBuilder {
             if (isBadge(n.text)) {
                 continue;
             }
-            if (n.text.length() <= 20 && tp.isPurePrice(n.text)) {
+            if (n.text.length() <= 20 && tp.isPriceNode(n.text)) {
                 priceNodes.add(n);
             }
         }
@@ -84,7 +95,7 @@ public final class CardBuilder {
         List<TextNode> names = new ArrayList<>();
 
         for (TextNode n : nodes) {
-            if (isBadge(n.text) || tp.isPurePrice(n.text)) {
+            if (isBadge(n.text) || tp.isPriceNode(n.text)) {
                 continue;
             }
             if (n.text.length() <= 16 && tp.parseWeightGrams(n.text) != null) {
@@ -149,8 +160,28 @@ public final class CardBuilder {
                 grams = tp.parseWeightGrams(bestWeight.text);
                 unitSource = bestWeight.text;
             }
+            // Контейнер карточки (название, которое содержит цену) — самый надёжный источник веса.
+            TextNode containerWithWeight = null;
+            long containerArea = Long.MAX_VALUE;
+            for (TextNode n : names) {
+                if (tp.parseWeightGrams(n.text) == null) {
+                    continue;
+                }
+                Rect r = n.bounds;
+                if (r.left <= pn.bounds.left && r.right >= pn.bounds.right
+                        && r.top <= pn.bounds.top && r.bottom >= pn.bounds.bottom) {
+                    long area = (long) r.width() * r.height();
+                    if (area < containerArea) {
+                        containerArea = area;
+                        containerWithWeight = n;
+                    }
+                }
+            }
+
             // Вес может быть прямо в названии: «Мука Makfa ... 1 кг» или Ozon «... 970 мл».
-            TextNode nameForWeight = bestWeightedName != null ? bestWeightedName : bestName;
+            TextNode nameForWeight = containerWithWeight != null
+                    ? containerWithWeight
+                    : (bestWeightedName != null ? bestWeightedName : bestName);
             if (grams == null && nameForWeight != null) {
                 grams = tp.parseWeightGrams(nameForWeight.text);
                 unitSource = nameForWeight.text;
@@ -204,33 +235,54 @@ public final class CardBuilder {
      * Крупнейшее «фото» над ценой, пересекающееся с ней по горизонтали.
      * Работает и для ImageView (Купер, Самокат), и для крупных View (Перекрёсток).
      */
-    private static Rect findPhoto(Rect anchor, List<Rect> images) {
+    /**
+     * Сначала ищем «голую» картинку над ценой (настоящее фото товара).
+     * Если её нет — берём контейнер самой карточки, который содержит цену,
+     * и ставим чип в его правый верхний угол. Так не цепляется соседняя карточка.
+     */
+    private static Rect findPhoto(Rect anchor, List<Img> images) {
         Rect best = null;
-        int bestBottom = Integer.MIN_VALUE;
-        long bestArea = 0;
-        for (Rect img : images) {
-            if (img.top < 0 || img.width() <= 0 || img.height() <= 0) {
+        int bestBottom = -1;
+        for (Img img : images) {
+            if (!img.bare) {
                 continue;
             }
-            if (img.bottom > anchor.top + 10) {
+            Rect r = img.rect;
+            if (r.top < 0 || r.bottom > anchor.top + 10) {
                 continue;
             }
-            if (anchor.top - img.bottom > 900) {
+            if (anchor.top - r.bottom > 900) {
                 continue;
             }
-            int overlap = Math.min(img.right, anchor.right) - Math.max(img.left, anchor.left);
-            if (overlap <= 0) {
+            if (!overlapsX(r, anchor)) {
                 continue;
             }
-            long area = (long) img.width() * img.height();
-            // Ближайшее к цене фото сверху; при равном низе — большее по площади.
-            if (img.bottom > bestBottom || (img.bottom == bestBottom && area > bestArea)) {
-                bestBottom = img.bottom;
-                bestArea = area;
-                best = img;
+            if (r.bottom > bestBottom) {
+                bestBottom = r.bottom;
+                best = r;
             }
         }
-        return best;
+        if (best != null) {
+            return best;
+        }
+
+        Rect container = null;
+        long bestArea = Long.MAX_VALUE;
+        for (Img img : images) {
+            Rect r = img.rect;
+            if (r.top < 0) {
+                continue;
+            }
+            if (r.left <= anchor.left && r.right >= anchor.right
+                    && r.top <= anchor.top && r.bottom >= anchor.bottom) {
+                long area = (long) r.width() * r.height();
+                if (area < bestArea) {
+                    bestArea = area;
+                    container = r;
+                }
+            }
+        }
+        return container;
     }
 
     /** Самый нижний ценоподобный узел рядом с комбинированной строкой (цена со скидкой). */
