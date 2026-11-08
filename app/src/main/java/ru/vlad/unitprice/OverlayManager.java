@@ -82,6 +82,7 @@ public final class OverlayManager {
             boolean ok = !clipped(c.anchor) && !underStickyHeader && mostlyVisible(region);
             android.util.Log.d("FairPrice", "card per=" + Math.round(c.perUnit())
                     + " price=" + c.price + " g=" + c.grams
+                    + " name=[" + c.name + "]"
                     + " anchor=" + c.anchor.toShortString()
                     + " photo=" + (c.photo == null ? "null" : c.photo.toShortString())
                     + " visible=" + ok);

@@ -75,6 +75,9 @@ public final class CardBuilder {
         for (TextNode n : nodes) {
             TextParser.Parsed p = tp.parseCombined(n.text);
             if (p != null) {
+                if (napkinNear(n.bounds, nodes)) {
+                    continue;
+                }
                 Card c = new Card();
                 c.name = n.text;
                 c.grams = p.grams;
@@ -98,6 +101,10 @@ public final class CardBuilder {
             if (isBadge(n.text) || tp.isPriceNode(n.text)) {
                 continue;
             }
+            // Комбинированная строка не должна служить «названием с весом» для соседней карточки.
+            if (n.text.contains("•") && n.text.contains("₽")) {
+                continue;
+            }
             if (n.text.length() <= 16 && tp.parseWeightGrams(n.text) != null) {
                 weights.add(n);
             } else if (n.text.length() > 6 && hasLetters(n.text)) {
@@ -108,6 +115,9 @@ public final class CardBuilder {
         for (TextNode pn : priceNodes) {
             Double price = tp.parsePrice(pn.text);
             if (price == null) {
+                continue;
+            }
+            if (napkinNear(pn.bounds, nodes)) {
                 continue;
             }
 
@@ -347,6 +357,26 @@ public final class CardBuilder {
             }
         }
         return best == null ? null : tp.parsePrice(best.text);
+    }
+
+    private static boolean isNapkin(String s) {
+        return s != null && s.toLowerCase().contains("салфетк");
+    }
+
+    private static boolean napkinNear(Rect anchor, List<TextNode> nodes) {
+        for (TextNode n : nodes) {
+            if (!isNapkin(n.text)) {
+                continue;
+            }
+            if (!overlapsX(anchor, n.bounds)) {
+                continue;
+            }
+            if (Math.abs(anchor.centerY() - n.bounds.centerY()) > 400) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     private static boolean overlapsX(Rect a, Rect b) {
