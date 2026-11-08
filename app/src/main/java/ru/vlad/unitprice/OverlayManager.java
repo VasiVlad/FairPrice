@@ -73,7 +73,7 @@ public final class OverlayManager {
                 continue;
             }
             Rect region = c.photo != null ? c.photo : c.anchor;
-            boolean ok = mostlyVisible(region);
+            boolean ok = !clipped(c.anchor) && mostlyVisible(region);
             android.util.Log.d("FairPrice", "card per=" + Math.round(c.perUnit())
                     + " price=" + c.price + " g=" + c.grams
                     + " anchor=" + c.anchor.toShortString()
@@ -144,6 +144,23 @@ public final class OverlayManager {
         for (int i = visible.size(); i < chips.size(); i++) {
             chips.get(i).setVisibility(View.GONE);
         }
+    }
+
+    /** Узел обрезан краем экрана: так выглядит карточка, которая влезла не полностью. */
+    private boolean clipped(Rect r) {
+        if (r == null) {
+            return true;
+        }
+        if (r.right >= screenWidth - 1 && r.width() < screenWidth * 0.45) {
+            return true;
+        }
+        if (r.left <= 1 && r.width() < screenWidth * 0.45) {
+            return true;
+        }
+        if (r.top <= 1 && r.height() < screenHeight * 0.20) {
+            return true;
+        }
+        return r.bottom >= screenHeight - 1 && r.height() < screenHeight * 0.20;
     }
 
     /**
