@@ -75,7 +75,11 @@ public final class OverlayManager {
                 continue;
             }
             Rect region = c.photo != null ? c.photo : c.anchor;
-            boolean ok = !clipped(c.anchor) && mostlyVisible(region);
+            boolean underStickyHeader =
+                    (cards.size() > 1 && c.photo != null && c.photo.top < screenHeight * 0.22)
+                            || (c.photo == null && c.anchor != null
+                            && c.anchor.top < screenHeight * 0.18);
+            boolean ok = !clipped(c.anchor) && !underStickyHeader && mostlyVisible(region);
             android.util.Log.d("FairPrice", "card per=" + Math.round(c.perUnit())
                     + " price=" + c.price + " g=" + c.grams
                     + " anchor=" + c.anchor.toShortString()

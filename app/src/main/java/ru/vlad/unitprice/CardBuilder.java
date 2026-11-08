@@ -118,24 +118,28 @@ public final class CardBuilder {
                 if (other == pn) {
                     continue;
                 }
-                if (!overlapsX(pn.bounds, other.bounds)) {
-                    continue;
-                }
-                if (Math.abs(pn.bounds.centerY() - other.bounds.centerY()) > 140) {
-                    continue;
-                }
-                int h = pn.bounds.height();
-                int oh = other.bounds.height();
-                if (oh > h + 4) {
-                    obsolete = true;
-                    break;
-                }
-                if (Math.abs(oh - h) <= 4) {
-                    Double op = tp.parsePrice(other.text);
-                    if (op != null && op > 0 && op < price) {
+                int dy = Math.abs(pn.bounds.centerY() - other.bounds.centerY());
+                Double op = tp.parsePrice(other.text);
+
+                if (overlapsX(pn.bounds, other.bounds) && dy <= 140) {
+                    int h = pn.bounds.height();
+                    int oh = other.bounds.height();
+                    if (oh > h + 4) {
                         obsolete = true;
                         break;
                     }
+                    if (Math.abs(oh - h) <= 4 && op != null && op > 0 && op < price) {
+                        obsolete = true;
+                        break;
+                    }
+                }
+
+                // Одна и та же цена встречается дважды на большой карточке (сверху и внизу).
+                if (op != null && Math.abs(op - price) < 0.01
+                        && dy > 80 && dy < 350
+                        && other.bounds.top > pn.bounds.top) {
+                    obsolete = true;
+                    break;
                 }
             }
             if (obsolete) {
@@ -251,11 +255,12 @@ public final class CardBuilder {
                 continue;
             }
             int overlap = Math.min(cc.anchor.right, c.anchor.right) - Math.max(cc.anchor.left, c.anchor.left);
-            if (overlap <= 0) {
-                continue;
-            }
             int dy = c.anchor.centerY() - cc.anchor.centerY();
-            if (dy > -60 && dy < 500) {
+            if (overlap > 0 && dy > -60 && dy < 500) {
+                return true;
+            }
+            // Большая карточка: комбинированная строка снизу, обычная цена справа.
+            if (Math.abs(c.price - cc.price) < 0.01 && Math.abs(dy) > 80 && Math.abs(dy) < 400) {
                 return true;
             }
         }
