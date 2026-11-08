@@ -1,0 +1,19 @@
+# Build artifacts
+build-manual/
+build/
+.gradle/
+*.apk
+*.aab
+
+# Local machine config
+local.properties
+
+# Signing
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
