@@ -10,8 +10,8 @@ android {
         applicationId = "ru.vlad.unitprice"
         minSdk = 26
         targetSdk = 33
-        versionCode = 8
-        versionName = "0.8"
+        versionCode = 10
+        versionName = "0.10"
     }
 
     buildTypes {

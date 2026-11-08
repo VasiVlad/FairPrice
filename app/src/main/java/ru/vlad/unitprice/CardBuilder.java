@@ -111,6 +111,37 @@ public final class CardBuilder {
                 continue;
             }
 
+            // На скидочной карточке рядом лежат старая (мелкая) и новая (крупная) цены.
+            // Оставляем крупную; при равном размере — меньшую.
+            boolean obsolete = false;
+            for (TextNode other : priceNodes) {
+                if (other == pn) {
+                    continue;
+                }
+                if (!overlapsX(pn.bounds, other.bounds)) {
+                    continue;
+                }
+                if (Math.abs(pn.bounds.centerY() - other.bounds.centerY()) > 140) {
+                    continue;
+                }
+                int h = pn.bounds.height();
+                int oh = other.bounds.height();
+                if (oh > h + 4) {
+                    obsolete = true;
+                    break;
+                }
+                if (Math.abs(oh - h) <= 4) {
+                    Double op = tp.parsePrice(other.text);
+                    if (op != null && op > 0 && op < price) {
+                        obsolete = true;
+                        break;
+                    }
+                }
+            }
+            if (obsolete) {
+                continue;
+            }
+
             TextNode bestName = null;
             double bestNameCost = 1e9;
             TextNode bestWeightedName = null;
@@ -251,7 +282,10 @@ public final class CardBuilder {
             if (r.top < 0 || r.bottom > anchor.top + 10) {
                 continue;
             }
-            if (anchor.top - r.bottom > 900) {
+            if (anchor.top - r.bottom > 650) {
+                continue;
+            }
+            if (Math.abs(r.centerX() - anchor.centerX()) > 220) {
                 continue;
             }
             if (!overlapsX(r, anchor)) {

@@ -3,6 +3,7 @@ package ru.vlad.unitprice;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
@@ -71,7 +72,14 @@ public final class OverlayManager {
             if (c.anchor == null) {
                 continue;
             }
-            if (c.anchor.bottom < 0 || c.anchor.top > screenHeight) {
+            Rect region = c.photo != null ? c.photo : c.anchor;
+            boolean ok = mostlyVisible(region);
+            android.util.Log.d("FairPrice", "card per=" + Math.round(c.perUnit())
+                    + " price=" + c.price + " g=" + c.grams
+                    + " anchor=" + c.anchor.toShortString()
+                    + " photo=" + (c.photo == null ? "null" : c.photo.toShortString())
+                    + " visible=" + ok);
+            if (!ok) {
                 continue;
             }
             double per = c.perUnit();
@@ -136,6 +144,39 @@ public final class OverlayManager {
         for (int i = visible.size(); i < chips.size(); i++) {
             chips.get(i).setVisibility(View.GONE);
         }
+    }
+
+    /**
+     * Показываем чип, только если карточка видна почти целиком.
+     * Учтены оба случая: узел отдаёт полные границы или уже обрезанные системой.
+     */
+    private boolean mostlyVisible(Rect r) {
+        if (r == null || r.width() <= 0 || r.height() <= 0) {
+            return false;
+        }
+        int left = Math.max(r.left, 0);
+        int right = Math.min(r.right, screenWidth);
+        int top = Math.max(r.top, 0);
+        int bottom = Math.min(r.bottom, screenHeight);
+        if (right <= left || bottom <= top) {
+            return false;
+        }
+        double widthRatio = (double) (right - left) / r.width();
+        double heightRatio = (double) (bottom - top) / r.height();
+        if (widthRatio < 0.9 || heightRatio < 0.9) {
+            return false;
+        }
+        // Узел уже обрезан краем экрана: полные размеры неизвестны, но карточка явно не влезла.
+        if (r.right >= screenWidth - 1 && r.width() < screenWidth * 0.45) {
+            return false;
+        }
+        if (r.left <= 1 && r.width() < screenWidth * 0.45) {
+            return false;
+        }
+        if (r.top <= 1 && r.height() < screenHeight * 0.30) {
+            return false;
+        }
+        return !(r.bottom >= screenHeight - 1 && r.height() < screenHeight * 0.30);
     }
 
     public void clear() {

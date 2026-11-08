@@ -241,6 +241,10 @@ public final class UnitPriceService extends AccessibilityService {
         } catch (Exception ignored) {
         }
         String pkg = rootPkg == null ? currentPackage : rootPkg.toString();
+        if (pkg.equals("com.android.systemui")) {
+            // Активна шторка/статус-бар: не трогаем уже нарисованные чипы.
+            return;
+        }
         if (pkg.equals(getPackageName()) && !allowSelfStatic && !Prefs.allowSelf(this)) {
             overlay.clear();
             return;
