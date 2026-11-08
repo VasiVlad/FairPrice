@@ -33,7 +33,7 @@ Write-Output "=== AAPT2 LINK ==="
 & "$bt\aapt2.exe" link -o "$work\app-unsigned.apk" -I $plat `
     --manifest "$work\AndroidManifest.xml" `
     --java "$work\gen" --min-sdk-version 26 --target-sdk-version 33 `
-    --version-code 4 --version-name 0.4 "$work\res.zip"
+    --version-code 5 --version-name 0.5 "$work\res.zip"
 Write-Output "exit=$LASTEXITCODE"
 
 Write-Output "=== JAVAC ==="

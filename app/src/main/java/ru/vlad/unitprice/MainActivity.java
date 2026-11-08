@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -13,6 +14,12 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public final class MainActivity extends Activity {
 
@@ -37,7 +44,8 @@ public final class MainActivity extends Activity {
 
         TextView subtitle = new TextView(this);
         subtitle.setText("Показывает цену за килограмм поверх карточек товаров.\n"
-                + "Работает без интернета и не отправляет данные наружу.");
+                + "Считает на телефоне, без аналитики и сбора данных. "
+                + "Интернет — только для проверки и установки обновлений.");
         subtitle.setTextSize(15f);
         subtitle.setTextColor(Color.DKGRAY);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
@@ -132,16 +140,73 @@ public final class MainActivity extends Activity {
                 new AlertDialog.Builder(this)
                         .setTitle("Доступно обновление")
                         .setMessage(message)
-                        .setPositiveButton("Скачать", (d, w) -> {
-                            try {
-                                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                            } catch (Exception ignored) {
-                            }
-                        })
+                        .setPositiveButton("Обновить", (d, w) -> updateTo(url))
                         .setNegativeButton("Позже", null)
                         .show();
             }
         }));
+    }
+
+    private void updateTo(String url) {
+        if (!canInstall()) {
+            openUnknownSources();
+            return;
+        }
+        updateStatus.setText("Скачиваю обновление…");
+        new Thread(() -> {
+            try {
+                File dir = new File(getCacheDir(), "updates");
+                if (!dir.exists() && !dir.mkdirs()) {
+                    throw new Exception("не удалось создать папку");
+                }
+                File apk = new File(dir, "fairprice-update.apk");
+
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(30000);
+                c.setInstanceFollowRedirects(true);
+                c.setRequestProperty("User-Agent", "FairPrice-Android");
+
+                int code = c.getResponseCode();
+                if (code != 200) {
+                    throw new Exception("HTTP " + code);
+                }
+                try (InputStream in = c.getInputStream();
+                     FileOutputStream out = new FileOutputStream(apk)) {
+                    byte[] buffer = new byte[8192];
+                    int n;
+                    while ((n = in.read(buffer)) > 0) {
+                        out.write(buffer, 0, n);
+                    }
+                }
+
+                runOnUiThread(() -> {
+                    updateStatus.setText("Скачано. Открываю установщик…");
+                    try {
+                        UpdateInstaller.install(this, apk);
+                    } catch (Exception e) {
+                        updateStatus.setText("Не удалось запустить установку: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> updateStatus.setText("Не удалось скачать: " + e.getMessage()));
+            }
+        }).start();
+    }
+
+    private boolean canInstall() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                || getPackageManager().canRequestPackageInstalls();
+    }
+
+    private void openUnknownSources() {
+        try {
+            startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())));
+            updateStatus.setText("Разреши установку из этого источника и нажми «Проверить обновления» снова.");
+        } catch (Exception e) {
+            updateStatus.setText("Разреши установку из неизвестных источников в настройках системы.");
+        }
     }
 
     @Override

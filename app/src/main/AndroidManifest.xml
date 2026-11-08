@@ -3,6 +3,7 @@
     package="ru.vlad.unitprice">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="@string/app_name"
@@ -33,6 +34,10 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false" />
 
         <service
             android:name=".OverlayTileService"
