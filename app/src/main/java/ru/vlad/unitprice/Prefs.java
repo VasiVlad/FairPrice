@@ -20,6 +20,7 @@ public final class Prefs {
             "ru.sbcs.store",
             "ru.instamart",
             "ru.bristol.bristol_app",
+            "ru.vkusvill",
             "ru.ozon.fresh",
             "ru.ozon.app.android",
             "ru.ozon.app"

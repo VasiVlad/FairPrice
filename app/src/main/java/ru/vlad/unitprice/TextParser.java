@@ -96,6 +96,8 @@ public final class TextParser {
         if (!PRICE.matcher(s).find()) {
             return false;
         }
+        // Допустимый хвост единицы после цены: "112₽/шт", "500 ₽/кг".
+        s = s.replaceAll("₽\\s*/\\s*(шт|кг|л)", "₽");
         for (int i = 0; i < s.length(); i++) {
             if (Character.isLetter(s.charAt(i))) {
                 return false;

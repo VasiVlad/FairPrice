@@ -76,7 +76,7 @@ public final class OverlayManager {
             }
             Rect region = c.photo != null ? c.photo : c.anchor;
             boolean underStickyHeader =
-                    (cards.size() > 1 && c.photo != null && c.photo.top < screenHeight * 0.22)
+                    (cards.size() > 1 && c.photo != null && c.photo.top < screenHeight * 0.19)
                             || (c.photo == null && c.anchor != null
                             && c.anchor.top < screenHeight * 0.18);
             boolean ok = !clipped(c.anchor) && !underStickyHeader && mostlyVisible(region);
