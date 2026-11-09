@@ -75,7 +75,7 @@ public final class CardBuilder {
         for (TextNode n : nodes) {
             TextParser.Parsed p = tp.parseCombined(n.text);
             if (p != null) {
-                if (napkinNear(n.bounds, nodes)) {
+                if (nonWeightNear(n.bounds, nodes)) {
                     continue;
                 }
                 Card c = new Card();
@@ -117,7 +117,7 @@ public final class CardBuilder {
             if (price == null) {
                 continue;
             }
-            if (napkinNear(pn.bounds, nodes)) {
+            if (nonWeightNear(pn.bounds, nodes)) {
                 continue;
             }
 
@@ -131,7 +131,15 @@ public final class CardBuilder {
                 int dy = Math.abs(pn.bounds.centerY() - other.bounds.centerY());
                 Double op = tp.parsePrice(other.text);
 
-                if (overlapsX(pn.bounds, other.bounds) && dy <= 140) {
+                // Старая и новая цена могут стоять рядом по горизонтали, а не друг под другом.
+                boolean sameColumn = overlapsX(pn.bounds, other.bounds) && dy <= 140;
+                if (!sameColumn) {
+                    int gap = Math.max(pn.bounds.left, other.bounds.left)
+                            - Math.min(pn.bounds.right, other.bounds.right);
+                    sameColumn = dy <= 60 && gap >= 0 && gap <= 260;
+                }
+
+                if (sameColumn) {
                     int h = pn.bounds.height();
                     int oh = other.bounds.height();
                     if (oh > h + 4) {
@@ -359,13 +367,18 @@ public final class CardBuilder {
         return best == null ? null : tp.parsePrice(best.text);
     }
 
-    private static boolean isNapkin(String s) {
-        return s != null && s.toLowerCase().contains("салфетк");
+    private static boolean isNonWeightProduct(String s) {
+        if (s == null) {
+            return false;
+        }
+        String x = s.toLowerCase();
+        return x.contains("салфетк") || x.contains("трусик") || x.contains("подгузник")
+                || x.contains("памперс") || x.contains("пеленк");
     }
 
-    private static boolean napkinNear(Rect anchor, List<TextNode> nodes) {
+    private static boolean nonWeightNear(Rect anchor, List<TextNode> nodes) {
         for (TextNode n : nodes) {
-            if (!isNapkin(n.text)) {
+            if (!isNonWeightProduct(n.text)) {
                 continue;
             }
             if (!overlapsX(anchor, n.bounds)) {

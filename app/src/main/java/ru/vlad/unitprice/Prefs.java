@@ -21,6 +21,7 @@ public final class Prefs {
             "ru.instamart",
             "ru.bristol.bristol_app",
             "ru.vkusvill",
+            "ru.detmir.dmbonus",
             "ru.ozon.fresh",
             "ru.ozon.app.android",
             "ru.ozon.app"
