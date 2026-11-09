@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
@@ -43,6 +44,8 @@ public final class MainActivity extends Activity {
     private View statusDot;
     private TextView statusButton;
     private TextView updateMessage;
+    private Switch allSwitch;
+    private TextView appsSubtitle;
 
     private int versionTaps;
     private long lastVersionTap;
@@ -169,13 +172,86 @@ public final class MainActivity extends Activity {
 
         card.addView(divider(), top(14));
 
-        card.addView(switchRow(
-                "Во всех приложениях",
-                "Выключите, чтобы работать только в магазинах",
-                Prefs.allApps(this),
-                (v, checked) -> Prefs.setAllApps(this, checked)));
+        card.addView(allAppsRow());
+
+        card.addView(divider(), top(14));
+
+        card.addView(appsRow());
 
         return card;
+    }
+
+    private View allAppsRow() {
+        LinearLayout row = rowTexts(
+                "Во всех приложениях",
+                "Выключите, чтобы работать только в выбранных");
+
+        allSwitch = new Switch(this);
+        allSwitch.setChecked(Prefs.allApps(this));
+        allSwitch.setShowText(false);
+        allSwitch.setOnCheckedChangeListener((v, checked) -> {
+            Prefs.setAllApps(this, checked);
+            refreshAppsRow();
+        });
+        LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        swLp.leftMargin = dp(12);
+        row.addView(allSwitch, swLp);
+        return row;
+    }
+
+    private View appsRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(0x111E7A3C),
+                new ColorDrawable(Color.TRANSPARENT), null));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+
+        TextView title = new TextView(this);
+        title.setText("Приложения");
+        title.setTextSize(16);
+        title.setTextColor(TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        texts.addView(title);
+
+        appsSubtitle = new TextView(this);
+        appsSubtitle.setTextSize(13);
+        appsSubtitle.setTextColor(MUTED);
+        texts.addView(appsSubtitle, top(2));
+
+        row.addView(texts, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView chevron = new TextView(this);
+        chevron.setText("›");
+        chevron.setTextSize(22);
+        chevron.setTextColor(MUTED);
+        row.addView(chevron);
+
+        row.setOnClickListener(v -> {
+            if (Prefs.allApps(this)) {
+                allSwitch.setChecked(false);
+            }
+            startActivity(new Intent(this, AppsActivity.class));
+        });
+        return row;
+    }
+
+    private void refreshAppsRow() {
+        if (appsSubtitle == null) {
+            return;
+        }
+        if (Prefs.allApps(this)) {
+            appsSubtitle.setText("Работает во всех приложениях");
+        } else {
+            appsSubtitle.setText("Выбрано: " + Prefs.enabledPackages(this).size());
+        }
     }
 
     private View updateCard() {
@@ -284,6 +360,20 @@ public final class MainActivity extends Activity {
 
     private LinearLayout switchRow(String title, String subtitle, boolean checked,
                                    CompoundButton.OnCheckedChangeListener listener) {
+        LinearLayout row = rowTexts(title, subtitle);
+
+        Switch toggle = new Switch(this);
+        toggle.setChecked(checked);
+        toggle.setShowText(false);
+        toggle.setOnCheckedChangeListener(listener);
+        LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        swLp.leftMargin = dp(12);
+        row.addView(toggle, swLp);
+        return row;
+    }
+
+    private LinearLayout rowTexts(String title, String subtitle) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -306,15 +396,6 @@ public final class MainActivity extends Activity {
 
         row.addView(texts, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        Switch toggle = new Switch(this);
-        toggle.setChecked(checked);
-        toggle.setShowText(false);
-        toggle.setOnCheckedChangeListener(listener);
-        LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        swLp.leftMargin = dp(12);
-        row.addView(toggle, swLp);
         return row;
     }
 
@@ -496,6 +577,7 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshStatus();
+        refreshAppsRow();
     }
 
     private void refreshStatus() {
