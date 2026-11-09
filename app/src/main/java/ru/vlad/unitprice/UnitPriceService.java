@@ -181,7 +181,7 @@ public final class UnitPriceService extends AccessibilityService {
         if (pkg.equals(getPackageName())) {
             return;
         }
-        if (!Prefs.allApps(this) && !Prefs.SUPPORTED.contains(pkg)) {
+        if (!Prefs.isPackageEnabled(this, pkg)) {
             return;
         }
         currentPackage = pkg;
@@ -293,6 +293,12 @@ public final class UnitPriceService extends AccessibilityService {
             return;
         }
         if (pkg.equals(getPackageName()) && !allowSelfStatic && !Prefs.allowSelf(this)) {
+            overlay.clear();
+            return;
+        }
+        // Сторожевой пересчёт и отложенные задачи могут прийти уже после смены
+        // приложения: не сканируем и не рисуем там, где пакет не выбран.
+        if (!Prefs.isPackageEnabled(this, pkg)) {
             overlay.clear();
             return;
         }
