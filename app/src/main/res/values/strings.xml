@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Цена за кг</string>
-    <string name="service_desc">Показывает цену за килограмм поверх карточек товаров в приложениях магазинов</string>
+    <string name="service_desc">Показывает цену за килограмм или литр на карточках товаров в приложениях магазинов. Работает прямо на экране телефона и не отправляет данные в интернет.</string>
 </resources>
