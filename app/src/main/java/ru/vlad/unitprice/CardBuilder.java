@@ -140,6 +140,15 @@ public final class CardBuilder {
                 }
 
                 if (sameColumn) {
+                    boolean thisUnit = isUnitPriceText(pn.text);
+                    boolean otherUnit = isUnitPriceText(other.text);
+                    // Обе цены — за штуку: берём меньшую (актуальная всегда ниже зачёркнутой
+                    // и ниже обычной, если есть цена по карте).
+                    if (!thisUnit && !otherUnit && op != null && op > 0 && op < price) {
+                        obsolete = true;
+                        break;
+                    }
+                    // Если замешана цена за кг/л — действуем по размеру шрифта.
                     int h = pn.bounds.height();
                     int oh = other.bounds.height();
                     if (oh > h + 4) {
@@ -365,6 +374,11 @@ public final class CardBuilder {
             }
         }
         return best == null ? null : tp.parsePrice(best.text);
+    }
+
+    private static boolean isUnitPriceText(String s) {
+        String x = s.toLowerCase();
+        return x.contains("/кг") || x.contains("/л");
     }
 
     private static boolean isNonWeightProduct(String s) {
