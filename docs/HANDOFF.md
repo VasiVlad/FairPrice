@@ -27,6 +27,13 @@ Java, без AndroidX и Gradle. Сборка вручную:
 4. Создать релиз через GitHub API, приложить APK.
    Токен: `git credential fill` (protocol=https, host=github.com).
 
+## Ветки
+
+- `main` — стабильная пользовательская версия.
+- `dev` — разработка; перед релизом мерж в `main`.
+- APK не коммитим: он прикрепляется к GitHub Release.
+- `debug.keystore` не коммитим никуда.
+
 Установка на устройство:
 
 ```
