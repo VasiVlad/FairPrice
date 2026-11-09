@@ -197,6 +197,21 @@ public final class CardBuilder {
                 }
             }
 
+            // Если цена уже за килограмм/литр — она и есть ответ, вес и остаток не нужны.
+            if (isKgPriceText(pn.text) || isLiterPriceText(pn.text)) {
+                Card c = new Card();
+                c.price = price;
+                c.grams = 1000;
+                c.unit = isLiterPriceText(pn.text) ? "л" : "кг";
+                c.anchor = pn.bounds;
+                if (bestName != null) {
+                    c.name = bestName.text;
+                }
+                c.photo = findPhoto(c.anchor, images);
+                result.add(c);
+                continue;
+            }
+
             TextNode bestWeight = null;
             double bestCost = 1e9;
             for (TextNode w : weights) {
@@ -374,6 +389,15 @@ public final class CardBuilder {
             }
         }
         return best == null ? null : tp.parsePrice(best.text);
+    }
+
+    private static boolean isKgPriceText(String s) {
+        return s != null && s.toLowerCase().replaceAll("\\s+", "").contains("₽/кг");
+    }
+
+    private static boolean isLiterPriceText(String s) {
+        String x = s == null ? "" : s.toLowerCase().replaceAll("\\s+", "");
+        return x.contains("₽/л");
     }
 
     private static boolean isUnitPriceText(String s) {
