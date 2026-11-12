@@ -203,17 +203,10 @@ public final class OverlayManager {
         if (widthRatio < 0.9 || heightRatio < 0.9) {
             return false;
         }
-        // Узел уже обрезан краем экрана: полные размеры неизвестны, но карточка явно не влезла.
-        if (r.right >= screenWidth - 1 && r.width() < screenWidth * 0.45) {
-            return false;
-        }
-        if (r.left <= 1 && r.width() < screenWidth * 0.45) {
-            return false;
-        }
-        if (r.top <= 1 && r.height() < screenHeight * 0.30) {
-            return false;
-        }
-        return !(r.bottom >= screenHeight - 1 && r.height() < screenHeight * 0.30);
+        // Не отбрасываем карточку только за то, что её фото/контейнер касается
+        // края экрана: у правой колонки карусели это нормально. Реальную
+        // обрезку ловит clipped() по ценнику (anchor).
+        return true;
     }
 
     public void clear() {

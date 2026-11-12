@@ -117,7 +117,7 @@ public final class CardBuilder {
             if (price == null) {
                 continue;
             }
-            if (nonWeightNear(pn.bounds, nodes)) {
+            if (nonWeightNear(pn.bounds, nodes) || serviceNear(pn.bounds, nodes)) {
                 continue;
             }
 
@@ -136,7 +136,10 @@ public final class CardBuilder {
                 if (!sameColumn) {
                     int gap = Math.max(pn.bounds.left, other.bounds.left)
                             - Math.min(pn.bounds.right, other.bounds.right);
-                    sameColumn = dy <= 60 && gap >= 0 && gap <= 260;
+                    // Рядом по горизонтали бывают старая и новая цена ОДНОЙ карточки
+                    // (зазор обычно десятки пикселей). У карусели Купера между
+                    // ценниками соседних карточек зазор ~190 px — их склеивать нельзя.
+                    sameColumn = dy <= 60 && gap >= 0 && gap <= 120;
                 }
 
                 if (sameColumn) {
@@ -412,6 +415,33 @@ public final class CardBuilder {
         String x = s.toLowerCase();
         return x.contains("салфетк") || x.contains("трусик") || x.contains("подгузник")
                 || x.contains("памперс") || x.contains("пеленк");
+    }
+
+    /** «Заказ от 800 ₽», «Доставка 199 ₽» — это не товар, а условия магазина. */
+    private static boolean isServiceText(String s) {
+        if (s == null) {
+            return false;
+        }
+        String x = s.toLowerCase();
+        return x.contains("заказ от") || x.contains("доставка")
+                || x.contains("бесплатно") || x.contains("минимальн")
+                || x.contains("мин. заказ") || x.contains("сервисный сбор");
+    }
+
+    private static boolean serviceNear(Rect anchor, List<TextNode> nodes) {
+        for (TextNode n : nodes) {
+            if (!isServiceText(n.text)) {
+                continue;
+            }
+            if (!overlapsX(anchor, n.bounds)) {
+                continue;
+            }
+            if (Math.abs(anchor.centerY() - n.bounds.centerY()) > 140) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     private static boolean nonWeightNear(Rect anchor, List<TextNode> nodes) {
