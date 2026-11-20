@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +24,8 @@ public final class UnitPriceService extends AccessibilityService {
     private static final long HOLD_MS = 350;
     private static final int MAX_NODES = 1000;
     private static final int MAX_DEPTH = 60;
+    /** Диагностика дерева: включать только для разбора новых экранов. */
+    private static final boolean DEBUG_TREE = false;
 
     private OverlayManager overlay;
     private String currentPackage = "";
@@ -143,6 +146,30 @@ public final class UnitPriceService extends AccessibilityService {
             return;
         }
         int type = event.getEventType();
+
+        if (DEBUG_TREE) {
+            android.util.Log.d("FairPrice", "event " + AccessibilityEvent.eventTypeToString(type)
+                    + " pkg=" + event.getPackageName() + " cls=" + event.getClassName()
+                    + " win=" + event.getWindowId());
+            if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    || type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+                try {
+                    List<AccessibilityWindowInfo> wins = getWindows();
+                    if (wins != null) {
+                        for (AccessibilityWindowInfo w : wins) {
+                            Rect wb = new Rect();
+                            w.getBoundsInScreen(wb);
+                            android.util.Log.d("FairPrice", "win id=" + w.getId()
+                                    + " type=" + w.getType()
+                                    + " active=" + w.isActive()
+                                    + " focused=" + w.isFocused()
+                                    + " bounds=" + wb.toShortString());
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
 
         // Касания приходят с packageName = null, поэтому обрабатываем их до всех проверок.
         // Прячем не по любому тапу, а только если палец задержался на экране.
@@ -303,12 +330,25 @@ public final class UnitPriceService extends AccessibilityService {
             return;
         }
 
+        // Купер открывает карточку товара поверх каталога в том же окне. В дереве
+        // остаются оба слоя, и цена карточки склеивается с весом товара из каталога.
+        // Если нашли кнопку «Закрыть» карточки — сканируем только её слой.
+        AccessibilityNodeInfo detailRoot = findDetailRoot(root, width, height);
+        AccessibilityNodeInfo scanRoot = detailRoot != null ? detailRoot : root;
+
         List<CardBuilder.TextNode> nodes = new ArrayList<>();
         List<CardBuilder.Img> images = new ArrayList<>();
-        collect(root, nodes, images, 0, width, height);
+        collect(scanRoot, nodes, images, 0, width, height);
 
         boolean kopeckMode = "ru.pyaterochka.app.browser".equals(pkg);
         List<CardBuilder.Card> cards = CardBuilder.build(nodes, images, width, kopeckMode);
+
+        // Если в «слое карточки» всё ещё несколько товаров — это каталог, а не
+        // карточка. Лучше убрать чипы, чем рисовать старые поверх открытой карточки.
+        if (detailRoot != null && cards.size() > 3) {
+            overlay.clear();
+            return;
+        }
         android.util.Log.d("FairPrice", "scan pkg=" + pkg + " nodes=" + nodes.size()
                 + " images=" + images.size() + " cards=" + cards.size());
 
@@ -322,6 +362,71 @@ public final class UnitPriceService extends AccessibilityService {
         retriedEmpty = false;
         lastCardCount = cards.size();
         overlay.render(cards);
+    }
+
+    /**
+     * Ищет открытую карточку товара по кнопке «Закрыть» в правом верхнем углу
+     * и возвращает верхний контейнер этой карточки. null — карточки нет.
+     */
+    private AccessibilityNodeInfo findDetailRoot(AccessibilityNodeInfo root, int w, int h) {
+        AccessibilityNodeInfo close = findCloseButton(root, w, h, 0);
+        if (close == null) {
+            return null;
+        }
+        AccessibilityNodeInfo node = close;
+        AccessibilityNodeInfo parent = node.getParent();
+        int guard = 0;
+        while (parent != null && parent.getParent() != null && guard++ < 20) {
+            node = parent;
+            parent = parent.getParent();
+        }
+        Rect r = new Rect();
+        node.getBoundsInScreen(r);
+        if (DEBUG_TREE) {
+            android.util.Log.d("FairPrice", "detail root=" + node.getClassName()
+                    + " " + r.toShortString() + " children=" + node.getChildCount());
+        }
+
+        // Верхний контейнер может содержать и каталог, и карточку двумя детьми.
+        // Берём ребёнка, внутри которого лежит кнопка «Закрыть», — это слой карточки.
+        AccessibilityNodeInfo inner = close;
+        AccessibilityNodeInfo p = inner.getParent();
+        int guard2 = 0;
+        while (p != null && !p.equals(node) && guard2++ < 20) {
+            inner = p;
+            p = p.getParent();
+        }
+        Rect ir = new Rect();
+        inner.getBoundsInScreen(ir);
+        if (DEBUG_TREE) {
+            android.util.Log.d("FairPrice", "detail inner=" + inner.getClassName()
+                    + " " + ir.toShortString() + " children=" + inner.getChildCount());
+        }
+        return inner;
+    }
+
+    private AccessibilityNodeInfo findCloseButton(AccessibilityNodeInfo node, int w, int h, int depth) {
+        if (node == null || depth > MAX_DEPTH) {
+            return null;
+        }
+        CharSequence cd = node.getContentDescription();
+        CharSequence tx = node.getText();
+        String s = ((cd == null ? "" : cd.toString()) + " "
+                + (tx == null ? "" : tx.toString())).toLowerCase();
+        if (s.contains("закрыть") || s.contains("close")) {
+            Rect r = new Rect();
+            node.getBoundsInScreen(r);
+            if (r.centerX() > w * 0.65 && r.centerY() < h * 0.35) {
+                return node;
+            }
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo c = findCloseButton(node.getChild(i), w, h, depth + 1);
+            if (c != null) {
+                return c;
+            }
+        }
+        return null;
     }
 
     private void collect(AccessibilityNodeInfo node, List<CardBuilder.TextNode> out,
@@ -347,6 +452,13 @@ public final class UnitPriceService extends AccessibilityService {
         }
 
         boolean priceNode = value != null && value.contains("₽");
+
+        if (DEBUG_TREE && value != null && value.length() > 0) {
+            android.util.Log.d("FairPrice", "node vis=" + node.isVisibleToUser()
+                    + " cls=" + node.getClassName()
+                    + " [" + value.toString().replace('\n', ' ') + "] "
+                    + r.toShortString());
+        }
 
         if (value != null && value.length() > 0 && validBounds
                 && r.bottom > 0 && r.top < screenH) {
